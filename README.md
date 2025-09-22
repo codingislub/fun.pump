@@ -1,1 +1,2 @@
 # pump.fun
+# fun.pump
