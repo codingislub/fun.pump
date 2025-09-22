@@ -33,24 +33,70 @@ export default function Home() {
     showTrade ? setShowTrade(false) : setShowTrade(true)
   }
 
-  async function loadBlockchainData() {
+async function loadBlockchainData() {
+  try {
+    console.log("=== Starting loadBlockchainData ===")
+    
     // Use MetaMask for our connection
     const provider = new ethers.BrowserProvider(window.ethereum)
     setProvider(provider)
-
+    
     // Get the current network
     const network = await provider.getNetwork()
+    console.log("Network chainId:", network.chainId.toString())
+
+    const factoryAddress = config[network.chainId]?.factory?.address
+    console.log("Factory address:", factoryAddress)
+    
+    if (!factoryAddress) {
+      console.error("No factory address found!")
+      return
+    }
+
+    const code = await provider.getCode(factoryAddress)
+    console.log("Contract code length:", code.length)
+    console.log("Has contract code:", code !== "0x")
+    
+    if (code === "0x") {
+      console.error("No contract found at this address!")
+      return
+    }
 
     // Create reference to Factory contract
-    const factory = new ethers.Contract(config[network.chainId].factory.address, Factory, provider)
+    const factory = new ethers.Contract(factoryAddress, Factory, provider)
     setFactory(factory)
+    console.log("Factory contract created")
+
+    // Test provider connection
+    console.log("=== Testing provider connection ===")
+    console.log("Provider network:", await provider.getNetwork())
+    
+    // Test raw call to fee() function
+    console.log("Testing raw call to fee()...")
+    try {
+      const rawResult = await provider.call({
+        to: factoryAddress,
+        data: "0xddca3f43" // Function selector for fee()
+      })
+      console.log("Raw result:", rawResult)
+    } catch (rawError) {
+      console.error("Raw call failed:", rawError)
+    }
 
     // Fetch the fee
-    const fee = await factory.fee()
-    setFee(fee)
+    try {
+      console.log("Attempting to call factory.fee()...")
+      const fee = await factory.fee()
+      console.log("Fee retrieved:", fee.toString())
+      setFee(fee)
+    } catch (error) {
+      console.error("Error calling fee():", error)
+      return
+    }
 
     // Prepare to fetch token details
     const totalTokens = await factory.totalTokens()
+    console.log("Total tokens:", totalTokens.toString())
     const tokens = []
 
     // We'll get the first 6 tokens listed
@@ -79,7 +125,12 @@ export default function Home() {
     // We reverse the array so we can get the most
     // recent token listed to display first
     setTokens(tokens.reverse())
+    console.log("Successfully loaded", tokens.length, "tokens")
+    
+  } catch (error) {
+    console.error("Error in loadBlockchainData:", error)
   }
+}
 
   useEffect(() => {
     loadBlockchainData()
